@@ -16,3 +16,87 @@ Desenvolver um modelo computacional capaz de simular a dinâmica de preços, div
 
 ## Status
 Projeto em desenvolvimento.
+
+
+## Como Executar no Google Colab
+
+Este projeto pode ser executado diretamente no Google Colab a partir do repositório no GitHub.
+
+### 1. Clonar o repositório
+
+```python
+!git clone https://github.com/gilbertogilfgp/Mercado-Artificial-Fiis.git
+```
+
+### 2. Entrar na pasta do projeto
+
+```python
+%cd /content/Mercado-Artificial-Fiis
+```
+
+### 3. Adicionar a raiz do projeto ao caminho do Python
+
+```python
+import sys
+sys.path.append('/content/Mercado-Artificial-Fiis')
+```
+
+### 4. Instalar as dependências
+
+```python
+!pip install -r requirements.txt
+```
+
+Caso o arquivo `requirements.txt` ainda não esteja completo, pode-se instalar manualmente:
+
+
+### 5. Importar a função principal da simulação
+
+```python
+from src.simulacao import simular_mercado_e_plotar
+```
+
+### 6. Definir os parâmetros do sistema
+
+```python
+parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
+```
+
+### 7. Executar uma simulação de teste
+
+```python
+resultado = simular_mercado_e_plotar(
+    parametros_sistema=parametros_sistema,
+    num_dias=30,
+    imprimir=False
+)
+```
+
+
+## Bloco único para execução no Colab
+
+```python
+!git clone https://github.com/gilbertogilfgp/Mercado-Artificial-Fiis.git
+%cd /content/Mercado-Artificial-Fiis
+
+import sys
+sys.path.append('/content/Mercado-Artificial-Fiis')
+
+!pip install -r requirements.txt
+
+from src.simulacao import simular_mercado_e_plotar
+
+parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
+
+resultado = simular_mercado_e_plotar(
+    parametros_sistema=parametros_sistema,
+    num_dias=30,
+    imprimir=True
+)
+```
+
+## Observações
+
+* Como o projeto utiliza uma estrutura com pasta `src`, é necessário adicionar a raiz do repositório ao `sys.path`.
+* Recomenda-se começar com um número pequeno de dias, como `10` ou `30`, para validar a execução inicial.
+* Após confirmar o funcionamento, o número de dias pode ser ampliado para experimentos mais longos.
