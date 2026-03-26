@@ -24,7 +24,8 @@ warnings.filterwarnings("ignore")
 
 from src.ativos import Imovel, FII
 from src.agentes import Agente, gerar_literacia_financeira
-from src.mercado import BancoCentral, Midia, Mercado
+from src.microestrutura import OrderBook
+
 
 class BancoCentral:
     def __init__(self, params: dict = None) -> None:
