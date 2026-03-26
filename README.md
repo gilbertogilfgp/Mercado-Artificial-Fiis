@@ -1,4 +1,5 @@
-# Mercado Artificial de FIIs
+# **FiiLMA**
+### *Laboratório de Mercado Artificial para Fundos Imobiliários*
 
 Este repositório contém a implementação de um mercado artificial de Fundos de Investimento Imobiliário (FIIs) baseado em agentes heterogêneos, com microestrutura de mercado via order book.
 
