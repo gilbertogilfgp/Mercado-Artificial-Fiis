@@ -483,7 +483,6 @@ def construir_M_momentos_bootstrap(
         m = calcular_momentos_uma_serie(
             X[b],
             lags_retornos=lags_retornos,
-            lags_abs=(1, 2),
             ddof_var=ddof_var,
             fisher_kurtosis=fisher_kurtosis,
             fft=fft
