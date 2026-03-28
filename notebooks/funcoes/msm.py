@@ -454,6 +454,47 @@ def calcular_momentos_uma_serie(
 
     return out
 
+
+def construir_M_momentos_bootstrap(
+    bootstraps: np.ndarray,
+    cols_momentos=None,
+    lags_retornos=(5, 10, 15, 20),
+    ddof_var=1,
+    fisher_kurtosis=False,
+    fft=True,
+) -> pd.DataFrame:
+    """
+    Constrói M (DataFrame B x k) com momentos calculados em cada réplica bootstrap.
+    """
+    if cols_momentos is None:
+        cols_momentos = [
+            "Media","Variancia","Assimetria","Curtose",
+            "acf_5","acf_10","acf_15","acf_20",
+            "autocorr_q_1","autocorr_q_2"
+        ]
+
+    X = np.asarray(bootstraps, dtype=float)
+    if X.ndim != 2:
+        raise ValueError("bootstraps deve ter shape (B, T)")
+    B, T = X.shape
+
+    rows = []
+    for b in range(B):
+        m = calcular_momentos_uma_serie(
+            X[b],
+            lags_retornos=lags_retornos,
+            lags_abs=(1, 2),
+            ddof_var=ddof_var,
+            fisher_kurtosis=fisher_kurtosis,
+            fft=fft
+        )
+        rows.append(m)
+
+    M_df = pd.DataFrame(rows, columns=cols_momentos)
+    return M_df
+
+
+
 def matriz_variancia_covariancia_dos_momentos(M_df: pd.DataFrame) -> np.ndarray:
     """
     Σ̂ = cov(M) com ddof=1 (B-1 no denominador).
