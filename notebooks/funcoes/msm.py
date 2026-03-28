@@ -1,5 +1,5 @@
 # Bibliotecas
-"""
+
 
 import os
 import warnings
@@ -28,7 +28,9 @@ from typing import Iterable, Callable, Optional, List, Dict
 
 warnings.filterwarnings("ignore")
 
-"""# Funções"""
+
+
+# Funções
 
 def moving_block_bootstrap(series, block_size=5, sample_size=60, n_replications=1000, random_state=None):
     """
