@@ -91,8 +91,8 @@ parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
 
 resultado = simular_mercado_e_plotar(
     parametros_sistema=parametros_sistema,
-    num_dias=30,
-    imprimir=True
+    num_dias=60,
+    imprimir=False
 )
 ```
 
