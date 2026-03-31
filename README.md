@@ -84,6 +84,8 @@ import sys
 sys.path.append('/content/Mercado-Artificial-Fiis')
 
 !pip install -r requirements.txt
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from src.simulacao import simular_mercado_e_plotar
 
