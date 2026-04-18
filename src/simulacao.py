@@ -139,6 +139,152 @@ SIM_PARAMS = {
 def calcular_sentimento_medio(agentes):
     return float(np.mean([agente.sentimento for agente in agentes]))
 
+# ══════════════════════════════════════════════════════════════
+# GRÁFICOS
+# ══════════════════════════════════════════════════════════════
+
+def plotar_resultado(resultado, params, num_dias, choques=None):
+    """
+    Gera o gráfico de 4 painéis a partir do resultado do simulador.
+
+    Parâmetros
+    ----------
+    resultado : tuple
+        Retorno de simular_mercado_e_plotar — (precos, retornos, vol, midia, sentimento)
+    params : dict
+        SIM_PARAMS usado na simulação — para leitura das cores e choques
+    num_dias : int
+        Número de dias simulados
+    choques : list, opcional
+        Lista de choques programados para marcação no gráfico.
+        Se None, usa params["choques"].
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    precos      = resultado[0]
+    retornos    = resultado[1]
+    volatilidade = resultado[2]
+    sentimento  = resultado[4]
+
+    choques = choques if choques is not None else params.get("choques", [])
+
+    NUM_DIAS    = num_dias
+    n_historico = len(precos) - NUM_DIAS
+
+    precos_hist   = np.array(precos[:n_historico])
+    precos_sim    = np.array(precos[n_historico:])
+    dias_hist     = np.arange(-n_historico + 1, 1)
+    dias_sim      = np.arange(1, NUM_DIAS + 1)
+
+    retornos_hist = np.array(retornos)[:-NUM_DIAS]
+    retornos_sim  = np.array(retornos)[-NUM_DIAS:]
+    dias_ret_hist = np.arange(-len(retornos_hist) + 1, 1)
+    dias_ret_sim  = np.arange(1, NUM_DIAS + 1)
+
+    sentimento_arr = np.array(sentimento)
+    dias_sent      = np.arange(1, len(sentimento_arr) + 1)
+
+    vol_completa  = np.array(volatilidade)
+    vol_hist      = vol_completa[:n_historico - 1]
+    vol_sim       = vol_completa[n_historico - 1:]
+    dias_vol_hist = np.arange(-n_historico + 2, 1)
+    dias_vol_sim  = np.arange(1, len(vol_sim) + 1)
+
+    COR_HIST = "#9EAFC2"
+    COR_SIM  = "#1a1a2e"
+    x_min = int(dias_hist[0]) - 1
+    x_max = NUM_DIAS + 1
+
+    CORES_CHOQUE = {
+        "noticia_negativo": "#d62728",
+        "noticia_positivo": "#2ca02c",
+        "macro":            "#ff7f0e",
+        "micro":            "#9467bd",
+    }
+
+    fig, axes = plt.subplots(4, 1, figsize=(13, 12), sharex=False)
+    fig.suptitle(
+        "Mercado Artificial de FIIs\n"
+        r"$(a_0,\ b_0,\ c_0,\ \beta,\ \omega)$ = θ*",
+        fontsize=12, fontweight="bold"
+    )
+
+    # Painel 1 — Preço
+    axes[0].plot(dias_hist, precos_hist, color=COR_HIST, lw=1.4, label="Histórico", zorder=2)
+    axes[0].fill_between(dias_hist, precos_hist, precos_hist.min(), color=COR_HIST, alpha=0.10)
+    axes[0].plot(dias_sim, precos_sim, color=COR_SIM, lw=1.8, label="Simulado", zorder=3)
+    axes[0].fill_between(dias_sim, precos_sim, precos_sim.min(), color=COR_SIM, alpha=0.07)
+    axes[0].axvline(0.5, color="black", lw=1.0, ls="--", alpha=0.4)
+    axes[0].set_ylabel("Preço (R$)", fontsize=10)
+    axes[0].set_xlim(x_min, x_max)
+    axes[0].grid(True, alpha=0.25, ls=":")
+
+    # Painel 2 — Retornos
+    axes[1].bar(dias_ret_hist, retornos_hist,
+                color=[COR_HIST if r >= 0 else "#d62728" for r in retornos_hist],
+                width=0.8, alpha=0.50)
+    axes[1].bar(dias_ret_sim, retornos_sim,
+                color=["#2ca02c" if r >= 0 else "#d62728" for r in retornos_sim],
+                width=0.8, alpha=0.75)
+    axes[1].axhline(0, color="black", lw=0.8, ls="--", alpha=0.5)
+    axes[1].axvline(0.5, color="black", lw=1.0, ls="--", alpha=0.4)
+    axes[1].set_ylabel("Retorno log-diário", fontsize=10)
+    axes[1].set_xlim(x_min, x_max)
+    axes[1].grid(True, alpha=0.25, ls=":")
+
+    # Painel 3 — Sentimento
+    axes[2].plot(dias_sent, sentimento_arr, color="#ff7f0e", lw=1.6, label="Sentimento médio")
+    axes[2].axhline(0, color="black", lw=0.8, ls=":", alpha=0.5)
+    axes[2].fill_between(dias_sent, sentimento_arr, 0,
+                         where=(sentimento_arr >= 0), color="#2ca02c", alpha=0.15, label="Positivo")
+    axes[2].fill_between(dias_sent, sentimento_arr, 0,
+                         where=(sentimento_arr < 0), color="#d62728", alpha=0.15, label="Negativo")
+    axes[2].axvline(0.5, color="black", lw=1.0, ls="--", alpha=0.4)
+    axes[2].set_ylabel("Sentimento médio", fontsize=10)
+    axes[2].set_ylim(-1.1, 1.1)
+    axes[2].set_xlim(x_min, x_max)
+    axes[2].legend(fontsize=8, loc="upper left")
+    axes[2].grid(True, alpha=0.25, ls=":")
+
+    # Painel 4 — Volatilidade
+    axes[3].plot(dias_vol_hist, vol_hist, color=COR_HIST, lw=1.4, label="Histórico", zorder=2)
+    axes[3].plot(dias_vol_sim, vol_sim, color="#e377c2", lw=1.8, label="Simulado", zorder=3)
+    axes[3].fill_between(dias_vol_sim, vol_sim, 0, color="#e377c2", alpha=0.10)
+    axes[3].axvline(0.5, color="black", lw=1.0, ls="--", alpha=0.4)
+    axes[3].set_ylabel("Volatilidade\nanualizada", fontsize=10)
+    axes[3].set_xlim(x_min, x_max)
+    axes[3].set_xlabel("Dia (0 = início da simulação)", fontsize=10)
+    axes[3].legend(fontsize=8, loc="upper left")
+    axes[3].grid(True, alpha=0.25, ls=":")
+
+    # Marcação dos choques
+    for choque in choques:
+        dia = choque["dia"]
+        cat = choque["categoria"]
+        if cat == "noticia":
+            tipo = choque.get("tipo", "negativo")
+            cor  = CORES_CHOQUE[f"noticia_{tipo}"]
+            lbl  = f"Notícia {tipo} (dia {dia})"
+        elif cat == "macro":
+            cor = CORES_CHOQUE["macro"]
+            lbl = f"Macro (dia {dia})"
+        else:
+            cor = CORES_CHOQUE["micro"]
+            lbl = f"Micro FII (dia {dia})"
+        for ax in axes:
+            ax.axvline(dia, color=cor, lw=1.5, ls=":", alpha=0.85,
+                       label=lbl if ax == axes[0] else "")
+
+    axes[0].legend(fontsize=8, loc="upper left")
+
+    plt.tight_layout()
+    plt.savefig("simulacao_resultado.png", dpi=150, bbox_inches="tight")
+    plt.show()
+    plt.close()
+
+
+
 
 # ══════════════════════════════════════════════════════════════
 # SIMULADOR PRINCIPAL
@@ -360,55 +506,20 @@ def simular_mercado_e_plotar(
 
     # ── Plot ──────────────────────────────────────────────────
     if imprimir:
-        print(f"\nPreço Final da Cota: R${fii.preco_cota:,.2f}")
-        print(f"Caixa Final do FII:  R${fii.caixa:,.2f}")
-
-        precos_plot = historico_precos_fii[-num_dias_sim:]
-        dias_array  = np.arange(num_dias_sim)
-
-        fig, ax = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
-
-        # Painel 1 — Preço
-        ax[0].plot(dias_array, precos_plot,
-                   label="Preço da Cota do FII", color="#1a1a2e")
-
-        # Marcar choques programados
-        cores_choque = {"noticia": "#e63946", "macro": "#e9c46a", "micro": "#7f77dd"}
-        for choque in choques:
-            d   = choque.get("dia", 0)
-            cat = choque.get("categoria", "noticia")
-            if 0 < d <= num_dias_sim:
-                cor = cores_choque.get(cat, "#888888")
-                for a in ax:
-                    a.axvline(d, color=cor, lw=1.2, ls="--", alpha=0.7)
-
-        ax[0].set_title("Evolução do Preço do FII")
-        ax[0].set_ylabel("Preço (R$)")
-        ax[0].legend()
-
-        # Painel 2 — Volatilidade (apenas onde definida)
-        vol  = volatilidade_rolante[-num_dias_sim + 1:]
-        mask = ~np.isnan(vol)
-        ax[1].plot(dias_array[1:][mask], vol[mask],
-                   label=f"Volatilidade rolante ({window}d)",
-                   color="orange")
-        ax[1].set_title("Volatilidade Rolante dos Retornos Logarítmicos")
-        ax[1].set_ylabel("Volatilidade Anualizada")
-        ax[1].legend()
-
-        # Painel 3 — Sentimento médio
-        ax[2].plot(dias_array,
-                   sentimento_medio_ao_longo_dos_dias,
-                   label="Sentimento médio", color="green")
-        ax[2].axhline(0, color="black", lw=0.8, ls=":", alpha=0.5)
-        ax[2].set_title("Sentimento Médio da População")
-        ax[2].set_ylabel("Sentimento")
-        ax[2].set_xlabel("Dias")
-        ax[2].set_ylim(-1.1, 1.1)
-        ax[2].legend()
-
-        plt.tight_layout()
-        plt.show()
+            plotar_resultado(
+                resultado=(historico_precos_fii, log_returns, volatilidade_rolante,
+                           midia, sentimento_medio_ao_longo_dos_dias),
+                params=params,
+                num_dias=num_dias_sim,
+            )
+    
+        return (
+            historico_precos_fii,
+            log_returns,
+            volatilidade_rolante,
+            midia,
+            sentimento_medio_ao_longo_dos_dias,
+        )
 
     return (
         historico_precos_fii,
