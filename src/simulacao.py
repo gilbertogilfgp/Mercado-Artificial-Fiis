@@ -113,7 +113,18 @@ SIM_PARAMS = {
     # categoria "micro" → modifica imóveis do FII (permanente)
     #   campos: dia, vac (%), custo (%)
     #
-    "choques": [],
+    "choques": [
+            # ── Categoria: notícia ────────────────────────────────────────────────────
+            # Simula evento informacional — rebaixamento, notícia adversa, euforia
+            {
+                "categoria":   "noticia",
+                "dia":         30,
+                "tipo":        "negativo",   # "negativo" ou "positivo"
+                "intensidade": 0.7,          # [0.0 — 1.0]
+                "duracao":     5,            # dias que o choque permanece ativo
+                "delta":       0.8,          # taxa de dissipação por dia (0=instantâneo, 1=sem dissipação)
+            },
+    ],
 
     # ── Mercado ───────────────────────────────────────────────
     "mercado": {
