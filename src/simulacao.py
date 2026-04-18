@@ -513,13 +513,6 @@ def simular_mercado_e_plotar(
                 num_dias=num_dias_sim,
             )
     
-        return (
-            historico_precos_fii,
-            log_returns,
-            volatilidade_rolante,
-            midia,
-            sentimento_medio_ao_longo_dos_dias,
-        )
 
     return (
         historico_precos_fii,
