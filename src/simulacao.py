@@ -1,3 +1,4 @@
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -5,311 +6,414 @@ from src.ativos import Imovel, FII
 from src.agentes import Agente, gerar_literacia_financeira
 from src.mercado import BancoCentral, Midia, Mercado
 
+
+SIM_PARAMS = {
+
+    "num_dias": 500,
+    "total_cota": 100_000,
+
+    # ── FII ───────────────────────────────────────────────────
+    "fii": {
+        "num_cotas": 100_000,
+        "caixa_inicial": 50_000,
+        "dividendos_taxa": 0.95,
+        "dividendos_caixa_taxa": 0.05,
+        "investimento_fracao": 0.50,
+        "memoria": True,
+    },
+
+    # ── Imóveis ───────────────────────────────────────────────
+    "imoveis": [
+        {"valor": 1_000_000, "vacancia": 0.1, "custo_manutencao": 200,
+         "params": {"aluguel_factor": 0.005, "desvio_normal": 0.01}},
+        {"valor": 2_000_000, "vacancia": 0.2, "custo_manutencao": 500,
+         "params": {"aluguel_factor": 0.005, "desvio_normal": 0.01}},
+    ],
+
+    # ── Agentes PF ────────────────────────────────────────────
+    "num_agentes_pf": 600,
+    "prop_cota_agente": 0.6,
+    "agente_pf": {
+        "caixa_inicial": 10_000,
+        "cotas_iniciais_primeiro": 100,
+        "cotas_iniciais_outros": 100,
+        "num_vizinhos": 30,
+        "epsilon_lf": 1.0,
+        "literacia_media": 0.3,
+        "literacia_std": 0.4,
+        "expectativa_inflacao": 0.05,
+        "expectativa_premio": 0.08,
+        "params": {
+            "ruido_std": 0.1,
+            "peso_retorno": 0.6,
+            "peso_riqueza": 0.4,
+        },
+    },
+
+    # ── Agentes PJ ────────────────────────────────────────────
+    "num_agentes_pj": 200,
+    "prop_cota_agente_pj": 0.2,
+    "agente_pj": {
+        "caixa_inicial": 10_000,
+        "cotas_iniciais_primeiro": 100,
+        "cotas_iniciais_outros": 100,
+        "num_vizinhos": 30,
+        "epsilon_lf": 1.0,
+        "literacia_media": 0.3,
+        "literacia_std": 0.4,
+        "expectativa_inflacao": 0.05,
+        "expectativa_premio": 0.08,
+        "params": {
+            "ruido_std": 0.05,
+            "peso_retorno": 0.3,
+            "peso_riqueza": 0.7,
+        },
+    },
+
+    # ── Banco Central ─────────────────────────────────────────
+    "banco_central": {
+        "taxa_selic": 0.15,
+        "expectativa_inflacao": 0.07,
+        "premio_risco": 0.08,
+    },
+
+    # ── Mídia ─────────────────────────────────────────────────
+    "midia": {
+        "valor_inicial": 0,
+        "sigma": 0.8,        # controla a volatilidade das notícias
+        "valores_fixos": {},
+    },
+
+    # ── Parâmetros de sentimento ──────────────────────────────
+    # a0, b0, c0, beta, peso_preco_esperado são injetados
+    # automaticamente via parametros_sistema
+    "parametros_sentimento": {
+        "ruido_std": 0.1,
+        "piso_prob_negociar": 0.1,
+        "peso_sentimento_inflacao": 0.4,
+        "peso_sentimento_expectativa": 0.4,
+        "quantidade_compra_min": 1,
+        "quantidade_compra_max": 30,
+        "window_volatilidade": 20,
+    },
+
+    # ── Choques aleatórios ────────────────────────────────────
+    "prob_choque_diario": 0.025,
+
+    # ── Choques programados ───────────────────────────────────
+    # Lista de choques a aplicar em dias específicos.
+    # Deixe vazia [] para nenhum choque programado.
+    #
+    # categoria "noticia" → aplica_choque() em cada agente (dissipa)
+    #   campos: dia, tipo, intensidade, duracao, delta
+    #
+    # categoria "macro" → modifica BancoCentral (permanente)
+    #   campos: dia, inflacao, premio
+    #
+    # categoria "micro" → modifica imóveis do FII (permanente)
+    #   campos: dia, vac (%), custo (%)
+    #
+    "choques": [],
+
+    # ── Mercado ───────────────────────────────────────────────
+    "mercado": {
+        "volatilidade_inicial": 0.1,
+        "dividendos_frequencia": 21,
+        "atualizacao_imoveis_frequencia": 126,
+    },
+
+    # ── Order Book ────────────────────────────────────────────
+    "order_book": {},
+
+    # ── Plot ──────────────────────────────────────────────────
+    "plot": {
+        "window_volatilidade": 20,
+    },
+}
+
+
+# ══════════════════════════════════════════════════════════════
+# FUNÇÃO AUXILIAR
+# ══════════════════════════════════════════════════════════════
+
 def calcular_sentimento_medio(agentes):
-    return np.mean([agente.sentimento for agente in agentes])
+    return float(np.mean([agente.sentimento for agente in agentes]))
 
 
+# ══════════════════════════════════════════════════════════════
+# SIMULADOR PRINCIPAL
+# ══════════════════════════════════════════════════════════════
 
-def simular_mercado_e_plotar(parametros_sistema, num_dias, imprimir = False):
-    random_seed = 42
-    # random.seed(random_seed)
-    # np.random.seed(random_seed)
+def simular_mercado_e_plotar(
+    parametros_sistema,
+    num_dias=None,
+    sim_params=None,
+    imprimir=False,
+):
+    """
+    Simula o mercado artificial de FIIs.
 
-    sim_params = {
-        # ... (seus parâmetros)
-        "num_dias": num_dias, # Ajustei o número de dias para ser testável. Você pode aumentar.
-        "total_cota": 100_000,
+    Parâmetros
+    ----------
+    parametros_sistema : list
+        Vetor calibrado [a0, b0, c0, beta, peso_preco_esperado].
+    num_dias : int, opcional
+        Sobrescreve SIM_PARAMS["num_dias"] se fornecido.
+    sim_params : dict, opcional
+        Dicionário de parâmetros. Se None, usa SIM_PARAMS global.
+        Para experimentos passe copy.deepcopy(SIM_PARAMS) modificado.
+    imprimir : bool
+        Se True, exibe estatísticas e gráficos ao final.
 
-        # Parâmetros do FII
-        "fii": {
-            "num_cotas": 100_000,
-            "caixa_inicial": 50_000,
-            "dividendos_taxa": 0.95,          # Fração do fluxo destinada à distribuição de dividendos
-            "dividendos_caixa_taxa": 0.05,      # Fração que permanece no caixa
-            "investimento_fracao": 0.50,        # Fração do caixa a ser investida na atualização dos imóveis
-            "memoria": True,
+    Retorna
+    -------
+    tuple
+        (historico_precos, log_returns, volatilidade_rolante,
+         midia, sentimento_medio_ao_longo_dos_dias)
+    """
 
-        },
+    # ── Configuração ──────────────────────────────────────────
+    params = copy.deepcopy(sim_params if sim_params is not None else SIM_PARAMS)
 
-        # Parâmetros dos Imóveis (cada dicionário pode ter parâmetros específicos para o imóvel)
-        "imoveis": [
-            {"valor": 1_000_000, "vacancia": 0.1, "custo_manutencao": 200,
-             "params": {"aluguel_factor": 0.005, "desvio_normal": 0.01}},
-            {"valor": 2_000_000, "vacancia": 0.2, "custo_manutencao": 500,
-             "params": {"aluguel_factor": 0.005, "desvio_normal": 0.01}},
-        ],
+    if num_dias is not None:
+        params["num_dias"] = num_dias
 
-        # Parâmetros dos Agentes
-        "num_agentes_pf": 600,
-        "prop_cota_agente": 0.6,
-        "agente_pf": {
-            "caixa_inicial": 10_000,
-            "cotas_iniciais_primeiro": 100,
-            "cotas_iniciais_outros": 100,
-            "num_vizinhos": 30,
-            "literacia_media": 0.3,
-            "literacia_std": 0.4,
-            "expectativa_inflacao": 0.05,
-            "expectativa_premio": 0.08,
-            # Parâmetros específicos do Agente (para cálculos internos)
-            "params": {
-                "window_chart": 21,
-                "alpha_chart_short": 0.3,
-                "alpha_chart_long": 0.1,
-                "ruido_std": 0.1,
-                "peso_retorno": 0.6,
-                "peso_riqueza": 0.4,
-            }
-        },
+    # Injetar parâmetros calibráveis
+    params["parametros_sentimento"].update({
+        "a0":                  parametros_sistema[0],
+        "b0":                  parametros_sistema[1],
+        "c0":                  parametros_sistema[2],
+        "beta":                parametros_sistema[3],
+        "peso_preco_esperado": parametros_sistema[4],
+    })
 
-        # Parâmetros dos Agentes PJ
-        "num_agentes_pj": 200,
-        "prop_cota_agente_pj": 0.2,
-        "agente_pj": {
-            "caixa_inicial": 10_000,
-            "cotas_iniciais_primeiro": 100,
-            "cotas_iniciais_outros": 100,
-            "num_vizinhos": 30,
-            "literacia_media": 0.3,
-            "literacia_std": 0.4,
-            "expectativa_inflacao": 0.05,
-            "expectativa_premio": 0.08,
-            # Parâmetros específicos do Agente PJ
-            "params": {
-                "window_chart": 21,
-                "alpha_chart_short": 0.3,
-                "alpha_chart_long": 0.1,
-                "ruido_std": 0.05,
-                "peso_retorno": 0.3,
-                "peso_riqueza": 0.7,
-            }
-        },
+    # Injetar prob_choque_diario
+    params["parametros_sentimento"]["prob_choque_diario"] = params.get(
+        "prob_choque_diario", 0.025
+    )
 
-        # Parâmetros do Banco Central
-        "banco_central": {
-            "taxa_selic": 0.15,
-            "expectativa_inflacao": 0.07,
-            "premio_risco": 0.08,
-        },
+    # ── FII e Imóveis ─────────────────────────────────────────
+    fii = FII(
+        num_cotas=params["fii"]["num_cotas"],
+        caixa=params["fii"]["caixa_inicial"],
+        params=params["fii"],
+    )
 
-        # Parâmetros da Mídia
-        "midia": {
-            "valor_inicial": 0,
-            "sigma": 0.1,
-            "valores_fixos": {#10: 1, 20: 0, 30: -3, 40: 0,
-                #50: 2, 100: -3, 101: -2, 150: 0, 200: 1, 250: 1,
-                #300: -3, 350: 0, 400: 0, 450: 0, 500: 0,
-                #550: 1, 600: -3, 610: -3, 620: -2,
-                #700: 0, 800: 0, 850: -1, 900: 0, 950: 1,
-                #1000: -1, 1050: 0, 1100: 1, 1150: 1, 1200: 0, 1250: 1
-            }
-        },
+    for ip in params["imoveis"]:
+        fii.adicionar_imovel(Imovel(
+            valor=ip["valor"],
+            vacancia=ip["vacancia"],
+            custo_manutencao=ip["custo_manutencao"],
+            params=ip.get("params", None),
+        ))
 
-        # Parâmetros para o sentimento (utilizados na criação de ordens e nos cálculos dos agentes)
-        "parametros_sentimento": {
-            "a0": parametros_sistema[0],
-            "b0": parametros_sistema[1],
-            "c0": parametros_sistema[2],
-            "beta": parametros_sistema[3],
-            "peso_preco_esperado": parametros_sistema[4],
-            "ruido_std":0.1 ,
-            "sigma_midia": 0.8,
-            "piso_prob_negociar": 0.1,
-            "peso_sentimento_inflacao": 0.4,
-            "peso_sentimento_expectativa": 0.4,
-            "quantidade_compra_min": 1,
-            "quantidade_compra_max": 30,
-
-             #choque
-
-            "dia":30 ,
-            "tipo": "negativo",
-            "intensidade": 0.7,
-            "duracao": 2,
-            "delta": 0.8,
-            "prob_choque_diario": 0.025
-
-        },
-
-        # Parâmetros do Mercado
-        "mercado": {
-            "volatilidade_inicial": 0.1,
-            "dividendos_frequencia": 21,            # Distribuição de dividendos a cada 21 dias
-            "atualizacao_imoveis_frequencia": 126,    # Atualização dos imóveis a cada 126 dias
-
-        },
-
-        # Parâmetros do OrderBook (pode ser extendido futuramente)
-        "order_book": {},
-
-        # Parâmetros para Plotagem
-        "plot": {
-            "window_volatilidade": 200,
-        },
-    }
-
-    # --- Inicialização do FII e dos Imóveis ---
-    total_cota = sim_params["total_cota"]
-    num_agentes = sim_params["num_agentes_pf"] + sim_params["num_agentes_pj"]
-    cota_agente = int(total_cota * sim_params["prop_cota_agente"])
-    cota_fii = total_cota - cota_agente
-
-    fii = FII(num_cotas=sim_params["fii"]["num_cotas"],
-              caixa=sim_params["fii"]["caixa_inicial"],
-              params=sim_params["fii"])
-
-    for imovel_param in sim_params["imoveis"]:
-        imovel = Imovel(valor=imovel_param["valor"],
-                        vacancia=imovel_param["vacancia"],
-                        custo_manutencao=imovel_param["custo_manutencao"],
-                        params=imovel_param.get("params", None))
-        fii.adicionar_imovel(imovel)
-
-
-    # print(f"Preço inicial da cota: R${fii.preco_cota:,.2f}") # Formatação simplificada
-
-    historia = fii.inicializar_historico(memoria=sim_params["fii"]["memoria"])
+    historia       = fii.inicializar_historico(memoria=params["fii"]["memoria"])
     fii.preco_cota = fii.historico_precos[-1]
 
-    historico_diviendos = fii.historico_dividendos
-
-    ########################################################################
-    # -------------------- Criação dos Agentes -----------------------------
-    ########################################################################
-
-    # --- Criação dos Agentes PF ---
-    agentes_pf = []
-    num_agentes_pf = sim_params["num_agentes_pf"]
+    # ── Agentes PF ────────────────────────────────────────────
+    agentes_pf     = []
+    num_agentes_pf = params["num_agentes_pf"]
 
     for i in range(num_agentes_pf):
-        cotas_iniciais = (sim_params["agente_pf"]["cotas_iniciais_primeiro"] if i == 0 else sim_params["agente_pf"]["cotas_iniciais_outros"])
-        agente = Agente(
+        cotas = (params["agente_pf"]["cotas_iniciais_primeiro"]
+                 if i == 0
+                 else params["agente_pf"]["cotas_iniciais_outros"])
+        agentes_pf.append(Agente(
             id=i,
-            literacia_financeira=gerar_literacia_financeira(minimo=0.2, maximo= 0.7),
-                # media=sim_params["agente"]["literacia_media"],
-                # desvio=sim_params["agente"]["literacia_std"]
-                # ),
-            caixa=sim_params["agente_pf"]["caixa_inicial"],
-            cotas=cotas_iniciais,
-            expectativa_inflacao=sim_params["agente_pf"]["expectativa_inflacao"],
-            expectativa_premio=sim_params["agente_pf"]["expectativa_premio"],
-            historico_precos=historia, # Passar numpy array
-            params=sim_params["agente_pf"].get("params", None)
-        )
-        agentes_pf.append(agente)
+            literacia_financeira=gerar_literacia_financeira(minimo=0.2, maximo=0.7),
+            caixa=params["agente_pf"]["caixa_inicial"],
+            cotas=cotas,
+            expectativa_inflacao=params["agente_pf"]["expectativa_inflacao"],
+            expectativa_premio=params["agente_pf"]["expectativa_premio"],
+            historico_precos=historia,
+            params=params["agente_pf"].get("params", None),
+        ))
 
-    # Definir vizinhos: pode ser feito em paralelo se a lista `todos_agentes` for estática
-    # Mas o custo de serialização pode não compensar para esta etapa de inicialização.
-
-    # --- Criação dos Agentes PJ ---
-
-    agentes_pj = []
-    num_agentes_pj = sim_params["num_agentes_pj"]
-
+    # ── Agentes PJ ────────────────────────────────────────────
+    agentes_pj     = []
+    num_agentes_pj = params["num_agentes_pj"]
 
     for i in range(num_agentes_pj):
-        cotas_iniciais = (sim_params["agente_pj"]["cotas_iniciais_primeiro"] if i == 0 else sim_params["agente_pj"]["cotas_iniciais_outros"])
-        agente = Agente(
+        cotas = (params["agente_pj"]["cotas_iniciais_primeiro"]
+                 if i == 0
+                 else params["agente_pj"]["cotas_iniciais_outros"])
+        agentes_pj.append(Agente(
             id=i + num_agentes_pf,
-            literacia_financeira=gerar_literacia_financeira(minimo=0.7, maximo= 1),
-                # media=sim_params["agente"]["literacia_media"],
-                # desvio=sim_params["agente"]["literacia_std"]
-                # ),
-            caixa=sim_params["agente_pj"]["caixa_inicial"],
-            cotas=cotas_iniciais,
-            expectativa_inflacao=sim_params["agente_pj"]["expectativa_inflacao"],
-            expectativa_premio=sim_params["agente_pj"]["expectativa_premio"],
-            historico_precos=historia, # Passar numpy array
-            params=sim_params["agente_pj"].get("params", None)
-        )
-        agentes_pj.append(agente)
+            literacia_financeira=gerar_literacia_financeira(minimo=0.7, maximo=1.0),
+            caixa=params["agente_pj"]["caixa_inicial"],
+            cotas=cotas,
+            expectativa_inflacao=params["agente_pj"]["expectativa_inflacao"],
+            expectativa_premio=params["agente_pj"]["expectativa_premio"],
+            historico_precos=historia,
+            params=params["agente_pj"].get("params", None),
+        ))
 
-    # --- Combinar todos os agentes ---
+    # ── Combinar e definir vizinhos ───────────────────────────
     agentes = agentes_pf + agentes_pj
 
-    # --- Definir vizinhos: grupos separados ---
     for agente in agentes_pf:
-        agente.definir_vizinhos(agentes, num_vizinhos=sim_params["agente_pf"]["num_vizinhos"])
+        agente.definir_vizinhos(
+            agentes,
+            num_vizinhos=params["agente_pf"]["num_vizinhos"],
+            epsilon_lf=params["agente_pf"].get("epsilon_lf", 1.0),
+        )
 
     for agente in agentes_pj:
-        agente.definir_vizinhos(agentes_pj, num_vizinhos=int(sim_params["agente_pj"]["num_vizinhos"]))
+        agente.definir_vizinhos(
+            agentes_pj,
+            num_vizinhos=int(params["agente_pj"]["num_vizinhos"]),
+            epsilon_lf=params["agente_pj"].get("epsilon_lf", 1.0),
+        )
 
     print(f"Total de Agentes: {len(agentes)}")
 
+    # ── Banco Central, Mídia e Mercado ────────────────────────
+    bc = BancoCentral(params["banco_central"])
 
-
-    # --- Criação do Banco Central, Mídia e Mercado ---
-    bc = BancoCentral(sim_params["banco_central"])
     midia = Midia(
-        dias=sim_params["num_dias"],
-        valor_inicial=sim_params["midia"]["valor_inicial"],
-        sigma=sim_params["parametros_sentimento"]["sigma_midia"],
-        valores_fixos=sim_params["midia"]["valores_fixos"]
+        dias=params["num_dias"],
+        valor_inicial=params["midia"]["valor_inicial"],
+        sigma=params["midia"]["sigma"],
+        valores_fixos=params["midia"]["valores_fixos"],
     )
 
-    mercado = Mercado(agentes=agentes,
-                      imoveis=fii.imoveis,
-                      fii=fii,
-                      banco_central=bc,
-                      midia=midia,
-                      params=sim_params["mercado"])
+    mercado = Mercado(
+        agentes=agentes,
+        imoveis=fii.imoveis,
+        fii=fii,
+        banco_central=bc,
+        midia=midia,
+        params=params["mercado"],
+    )
 
-    parametros_sentimento = sim_params["parametros_sentimento"]
+    parametros_sentimento = params["parametros_sentimento"]
+    choques               = params.get("choques", [])
+    num_dias_sim          = params["num_dias"]
 
-    # --- Loop da Simulação ---
-    historico_precos_fii = historia
+    # ── Loop da simulação ─────────────────────────────────────
+    historico_precos_fii               = list(historia)
     sentimento_medio_ao_longo_dos_dias = []
-    num_dias = sim_params["num_dias"]
 
-    # *** Ponto de otimização principal: Loop diário ***
-    # Se os cálculos dos agentes são independentes (como no seu caso para sentimento, expectativas),
-    # a paralelização aqui pode ter um impacto significativo.
-    # Coloquei o código para `_processar_agente_para_pool` na classe `Mercado` para manter a organização.
+    for dia in range(1, num_dias_sim + 1):
 
-    for dia in range(1, num_dias + 1):
-        # A chamada a mercado.executar_dia agora usará o Pool.map internamente.
         mercado.executar_dia(parametros_sentimento)
 
-        # O calcular_sentimento_medio já é vetorizado.
-        sentimento_medio_ao_longo_dos_dias.append(calcular_sentimento_medio(mercado.agentes))
+        # ── Choques programados ───────────────────────────────
+        for choque in choques:
+            if choque.get("dia") != dia:
+                continue
+
+            categoria = choque.get("categoria", "noticia")
+
+            if categoria == "noticia":
+                for ag in mercado.agentes:
+                    ag.aplicar_choque(
+                        tipo_choque  = choque.get("tipo", "negativo"),
+                        intensidade  = choque.get("intensidade", 0.5),
+                        duracao      = choque.get("duracao", 2),
+                        delta        = choque.get("delta", 0.8),
+                    )
+                if imprimir:
+                    print(f"  💥 Dia {dia}: choque notícia "
+                          f"{choque.get('tipo')} "
+                          f"(int={choque.get('intensidade')}, "
+                          f"dur={choque.get('duracao')}, "
+                          f"δ={choque.get('delta')})")
+
+            elif categoria == "macro":
+                if "inflacao" in choque:
+                    mercado.banco_central.expectativa_inflacao = choque["inflacao"]
+                if "premio" in choque:
+                    mercado.banco_central.premio_risco = choque["premio"]
+                if imprimir:
+                    print(f"  📊 Dia {dia}: choque macro "
+                          f"(inflação={choque.get('inflacao')}, "
+                          f"prêmio={choque.get('premio')})")
+
+            elif categoria == "micro":
+                for im in mercado.fii.imoveis:
+                    if "vac" in choque:
+                        im.vacancia *= (1 + choque["vac"] / 100)
+                    if "custo" in choque:
+                        im.custo_manutencao *= (1 + choque["custo"] / 100)
+                if imprimir:
+                    print(f"  🏠 Dia {dia}: choque micro FII "
+                          f"(vac={choque.get('vac')}%, "
+                          f"custo={choque.get('custo')}%)")
+
+        sentimento_medio_ao_longo_dos_dias.append(
+            calcular_sentimento_medio(mercado.agentes)
+        )
         historico_precos_fii.append(mercado.fii.preco_cota)
 
+    # ── Pós-processamento ─────────────────────────────────────
     historico_precos_fii = np.array(historico_precos_fii)
-    # np.diff já é eficiente
-    log_returns = np.diff(np.log(historico_precos_fii))
+    log_returns          = np.diff(np.log(historico_precos_fii))
 
-    # --- Cálculo da Volatilidade Rolante ---
-    window = sim_params["plot"]["window_volatilidade"]
-    # np.full_like e np.std já são eficientes
+    window               = params["plot"]["window_volatilidade"]
     volatilidade_rolante = np.full_like(log_returns, np.nan)
-    # Este loop ainda é Python, mas para o cálculo da volatilidade rolante (uma vez por dia),
-    # não é um gargalo tão grande quanto os cálculos de agentes por dia.
+
     for i in range(window, len(log_returns)):
-        volatilidade_rolante[i] = np.std(log_returns[i-window:i]) * (252 ** 0.5)
+        volatilidade_rolante[i] = (
+            np.std(log_returns[i - window:i]) * (252 ** 0.5)
+        )
 
+    # ── Plot ──────────────────────────────────────────────────
     if imprimir:
+        print(f"\nPreço Final da Cota: R${fii.preco_cota:,.2f}")
+        print(f"Caixa Final do FII:  R${fii.caixa:,.2f}")
 
-        # --- Exibição Final ---
-        print(f"Preço Final da Cota: R${fii.preco_cota:,.2f}")
-        print(f"Caixa Final do FII: R${fii.caixa:,.2f}")
-        for agente in agentes:
-          print(f"Agente {agente.id}: Caixa: R${agente.caixa:,.2f}, Sentimento: {agente.sentimento:.2f}, Riqueza: R${agente.historico_riqueza[-1]:,.2f}")
+        precos_plot = historico_precos_fii[-num_dias_sim:]
+        dias_array  = np.arange(num_dias_sim)
 
-        # --- Plotagem dos Resultados ---
-        dias_array = np.arange(num_dias)
-        fig, ax = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
-        ax[0].plot(dias_array, historico_precos_fii, label="Preço da Cota do FII")
+        fig, ax = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+        # Painel 1 — Preço
+        ax[0].plot(dias_array, precos_plot,
+                   label="Preço da Cota do FII", color="#1a1a2e")
+
+        # Marcar choques programados
+        cores_choque = {"noticia": "#e63946", "macro": "#e9c46a", "micro": "#7f77dd"}
+        for choque in choques:
+            d   = choque.get("dia", 0)
+            cat = choque.get("categoria", "noticia")
+            if 0 < d <= num_dias_sim:
+                cor = cores_choque.get(cat, "#888888")
+                for a in ax:
+                    a.axvline(d, color=cor, lw=1.2, ls="--", alpha=0.7)
+
         ax[0].set_title("Evolução do Preço do FII")
-        ax[0].set_ylabel("Preço")
+        ax[0].set_ylabel("Preço (R$)")
         ax[0].legend()
-        ax[1].plot(dias_array[1:], volatilidade_rolante, label="Volatilidade Rolante (20 dias)", color="orange")
+
+        # Painel 2 — Volatilidade (apenas onde definida)
+        vol  = volatilidade_rolante[-num_dias_sim + 1:]
+        mask = ~np.isnan(vol)
+        ax[1].plot(dias_array[1:][mask], vol[mask],
+                   label=f"Volatilidade rolante ({window}d)",
+                   color="orange")
         ax[1].set_title("Volatilidade Rolante dos Retornos Logarítmicos")
-        ax[1].set_ylabel("Volatilidade")
-        ax[1].set_xlabel("Dias")
+        ax[1].set_ylabel("Volatilidade Anualizada")
         ax[1].legend()
+
+        # Painel 3 — Sentimento médio
+        ax[2].plot(dias_array,
+                   sentimento_medio_ao_longo_dos_dias,
+                   label="Sentimento médio", color="green")
+        ax[2].axhline(0, color="black", lw=0.8, ls=":", alpha=0.5)
+        ax[2].set_title("Sentimento Médio da População")
+        ax[2].set_ylabel("Sentimento")
+        ax[2].set_xlabel("Dias")
+        ax[2].set_ylim(-1.1, 1.1)
+        ax[2].legend()
+
         plt.tight_layout()
         plt.show()
 
-    return historico_precos_fii, log_returns, volatilidade_rolante, midia, sentimento_medio_ao_longo_dos_dias
-
-
+    return (
+        historico_precos_fii,
+        log_returns,
+        volatilidade_rolante,
+        midia,
+        sentimento_medio_ao_longo_dos_dias,
+    )
