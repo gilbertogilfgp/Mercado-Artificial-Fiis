@@ -77,25 +77,47 @@ resultado = simular_mercado_e_plotar(
 ## Bloco único para execução no Colab
 
 ```python
+import numpy as np
+import matplotlib.pyplot as plt
+import copy
+
 !git clone https://github.com/gilbertogilfgp/Mercado-Artificial-Fiis.git
 %cd /content/Mercado-Artificial-Fiis
 
-import sys
-sys.path.append('/content/Mercado-Artificial-Fiis')
+import sys, types
 
-!pip install -r requirements.txt
-import pandas as pd
-import matplotlib.pyplot as plt
+src_package = types.ModuleType('src')
+src_package.__path__ = ['/content/Mercado-Artificial-Fiis/src']
+src_package.__package__ = 'src'
+sys.modules['src'] = src_package
 
-from src.simulacao import simular_mercado_e_plotar
+for mod in list(sys.modules.keys()):
+    if mod.startswith('src.'):
+        del sys.modules[mod]
+
+if '/content/Mercado-Artificial-Fiis' not in sys.path:
+    sys.path.insert(0, '/content/Mercado-Artificial-Fiis')
+
+!pip install -r requirements.txt --quiet
+
+
+from src.simulacao import simular_mercado_e_plotar, plotar_resultado, SIM_PARAMS
 
 parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
+params = copy.deepcopy(SIM_PARAMS)
+NUM_DIAS    = 60
 
+# Rodar sem plotar
 resultado = simular_mercado_e_plotar(
     parametros_sistema=parametros_sistema,
-    num_dias=60,
-    imprimir=False
+    num_dias=NUM_DIAS,
+    sim_params=params,
+    imprimir=False,        
 )
+
+
+# Plotar quando quiser, com choques destacados
+plotar_resultado(resultado, params, num_dias=60)
 ```
 
 ## Observações
