@@ -469,6 +469,13 @@ def simular_mercado_e_plotar(
                         duracao      = choque.get("duracao", 2),
                         delta        = choque.get("delta", 0.8),
                     )
+
+                intensidade = choque.get("intensidade", 0.5)
+                if choque.get("tipo") == "negativo":
+                   mercado._choque_news = -(1 + 2 * intensidade)
+                elif choque.get("tipo") == "positivo":
+                  mercado._choque_news = +(1 + 2 * intensidade)
+                    
                 if imprimir:
                     print(f"  💥 Dia {dia}: choque notícia "
                           f"{choque.get('tipo')} "
