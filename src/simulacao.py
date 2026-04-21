@@ -453,8 +453,7 @@ def simular_mercado_e_plotar(
 
     for dia in range(1, num_dias_sim + 1):
 
-        mercado.executar_dia(parametros_sentimento)
-
+        
         # ── Choques programados ───────────────────────────────
         for choque in choques:
             if choque.get("dia") != dia:
@@ -498,6 +497,7 @@ def simular_mercado_e_plotar(
                           f"(vac={choque.get('vac')}%, "
                           f"custo={choque.get('custo')}%)")
 
+        mercado.executar_dia(parametros_sentimento)
         sentimento_medio_ao_longo_dos_dias.append(
             calcular_sentimento_medio(mercado.agentes)
         )
