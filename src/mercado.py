@@ -288,13 +288,6 @@ class Mercado:
                         delta=delta_random
                     )
 
-        # Atualiza dissipação dos choques ativos em todos os agentes
-        for agente in self.agentes:
-            if hasattr(agente, "atualizar_choque"):
-              agente.atualizar_choque()
-
-
-
         # 1. Gerar Notícias
         try:
             self.news = self.midia.gerar_noticia()
@@ -501,6 +494,11 @@ class Mercado:
                  self.volatilidade_historica = 0.1 # Valor inicial ou default
 
         #print(f"[Mercado] Preço de Fechamento: R${self.fii.preco_cota:,.2f}, Vol. Histórica (Prox Dia): {self.volatilidade_historica:.4f}")
+        
+        # Atualiza dissipação dos choques ativos em todos os agentes
+        for agente in self.agentes:
+            if hasattr(agente, "atualizar_choque"):
+              agente.atualizar_choque()
 
     def fechar_pool(self):
         self.pool.close()
