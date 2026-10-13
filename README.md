@@ -1,7 +1,7 @@
 # **FiiLMA**
 ### *Laboratório de Mercado Artificial para Fundos Imobiliários*
 
-Este repositório contém a implementação de um mercado artificial de Fundos de Investimento Imobiliário (FIIs) baseado em agentes heterogêneos, com microestrutura de mercado via order book.
+Este repositório contém a implementação de um mercado artificial de Fundos de Investimento Imobiliário (FIIs) baseado em agentes heterogêneos, com microestrutura de mercado via order book com leilão duplo contínuo.
 
 ## Objetivo
 Desenvolver um modelo computacional capaz de simular a dinâmica de preços, dividendos, sentimento, negociação e efeitos de choques em um mercado artificial de FIIs.
@@ -60,19 +60,51 @@ from src.simulacao import simular_mercado_e_plotar
 ### 6. Definir os parâmetros do sistema
 
 ```python
-parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
+parametros_sistema = [0.848228, 0.695407, 0.878559, 0.155958, 0.075485]
+params = copy.deepcopy(SIM_PARAMS)
+NUM_DIAS    = 60
+```
+### 7. Configurar choques se desejar
+```params = copy.deepcopy(SIM_PARAMS)
+
+# Opcional: isola os choques programados (desliga o ruído aleatório diário).
+# Deixe comentado para manter o mercado com ruído de fundo.
+params["prob_choque_diario"] = 0.0025
+
+# Um choque de cada categoria. Ajuste dias, sinais e magnitudes à vontade.
+params["choques"] = [
+    # Notícia (dissipa ao longo da duração)
+    {"categoria": "noticia", "dia": 25, "tipo": "positivo",
+     "intensidade": 1.0, "duracao": 5, "delta": 1},
+    
+    {"categoria": "noticia", "dia": 30, "tipo": "positivo",
+     "intensidade": 1.0, "duracao": 5, "delta": 1},
+    
+    {"categoria": "noticia", "dia": 45, "tipo": "negativo",
+     "intensidade": 1, "duracao": 5, "delta": 1},
+
+    # Macro (muda o Banco Central a partir do dia; base: inflação 0.07, prêmio 0.08)
+    #{"categoria": "macro", "dia": 30, "inflacao": 0.10, "premio": 0.11},
+
+    # Micro (muda vacância e custo dos imóveis, em %, a partir do dia)
+    #{"categoria": "micro", "dia": 45, "vac": 30, "custo": 30},
+]
 ```
 
-### 7. Executar uma simulação de teste
+### 8. Executar uma simulação de teste
 
 ```python
 resultado = simular_mercado_e_plotar(
     parametros_sistema=parametros_sistema,
-    num_dias=30,
+    num_dias=60,
     imprimir=False
 )
 ```
+### 9. Plotar
+```python
 
+plotar_resultado(resultado, params, num_dias=60)
+```
 
 ## Bloco único para execução no Colab
 
@@ -103,9 +135,35 @@ if '/content/Mercado-Artificial-Fiis' not in sys.path:
 
 from src.simulacao import simular_mercado_e_plotar, plotar_resultado, SIM_PARAMS
 
-parametros_sistema = [0.51347849, 0.7764068, 0.62932969, 0.19668823, 0.11836951]
+parametros_sistema = [0.848228, 0.695407, 0.878559, 0.155958, 0.075485]
 params = copy.deepcopy(SIM_PARAMS)
 NUM_DIAS    = 60
+
+# Simular Choques
+params = copy.deepcopy(SIM_PARAMS)
+
+# Opcional: isola os choques programados (desliga o ruído aleatório diário).
+# Deixe comentado para manter o mercado com ruído de fundo.
+# params["prob_choque_diario"] = 0.00
+
+# Um choque de cada categoria. Ajuste dias, sinais e magnitudes à vontade.
+params["choques"] = [
+    # Notícia (dissipa ao longo da duração)
+    {"categoria": "noticia", "dia": 25, "tipo": "positivo",
+     "intensidade": 1.0, "duracao": 5, "delta": 1},
+    
+    {"categoria": "noticia", "dia": 30, "tipo": "positivo",
+     "intensidade": 1.0, "duracao": 5, "delta": 1},
+    
+    {"categoria": "noticia", "dia": 45, "tipo": "negativo",
+     "intensidade": 1, "duracao": 5, "delta": 1},
+
+    # Macro (muda o Banco Central a partir do dia; base: inflação 0.07, prêmio 0.08)
+    #{"categoria": "macro", "dia": 30, "inflacao": 0.10, "premio": 0.11},
+
+    # Micro (muda vacância e custo dos imóveis, em %, a partir do dia)
+    #{"categoria": "micro", "dia": 45, "vac": 30, "custo": 30},
+]
 
 # Rodar sem plotar
 resultado = simular_mercado_e_plotar(
